@@ -10,7 +10,7 @@ public class Client {
 
     private DatagramSocket clientSocket;
     private DatagramPacket clientPacket;
-    private int clientPort;
+    private int serverPort;
 
     //Constructor
 
@@ -20,7 +20,7 @@ public class Client {
         } catch (SocketException e) {
             e.printStackTrace();
         }
-        this.clientPort = 69;
+        this.serverPort = 69;
         this.clientPacket = new DatagramPacket(new byte[512], 512);
     }
 
@@ -28,19 +28,26 @@ public class Client {
 
     public void write (String fileName){
 
-        byte[] host = { (byte)0, (byte)0, (byte)0, (byte)0};
+        byte[] host = { (byte)169, (byte)254, (byte)114, (byte)197};
         InetAddress ias = null;
 
         try {
             ias = InetAddress.getByAddress(host);
+            System.out.println(ias);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
+
+
         //Open file
 
         File fic = new File(new String(fileName));
+        FileInputStream stream = null;
+        System.out.println("Opening file");
+
         try {
-            FileInputStream stream = new FileInputStream(fic);
+            stream = new FileInputStream(fic);
+            System.out.println("Creating stream");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -49,13 +56,14 @@ public class Client {
         //Create WRQ DatagramPacket
 
         String str = "\0\2"+fileName+"\0"+"octet"+"\0";
-        DatagramPacket wrqPacket = new DatagramPacket(str.getBytes(), str.length(), ias, clientPort);
+        DatagramPacket wrqPacket = new DatagramPacket(str.getBytes(), str.length(), ias, serverPort);
 
         //Connection
 
         do {
             try {
                 clientSocket.send(wrqPacket);
+                System.out.println("Sending WRQ");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -72,8 +80,68 @@ public class Client {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        } while(! new String("\0\4\0").equals(new String(clientPacket.getData())));
+        } while(! new String("\0\4\0\0").equals(new String(clientPacket.getData())));
 
+        //Running
+
+        serverPort = clientPacket.getPort();
+        byte fileContent[] = new byte[512];
+        int cpt = 0;
+        short numPacket = 1;
+
+        while (cpt < fic.length()){
+
+            //Reading 512 bytes in file
+
+            try {
+                stream.read(fileContent, cpt, 512);
+                cpt += 512;
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Exception while reading file " + e);
+            }
+
+            //Sending packet
+
+            String strData = "\0\3"+numPacket+fileContent;
+            DatagramPacket filePacket = new DatagramPacket(str.getBytes(), str.length(), ias, serverPort);
+
+            do {
+
+                try {
+                    clientSocket.send(filePacket);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                //Receiving ACK
+
+                clientPacket = new DatagramPacket(new byte[4], 4);
+
+                try {
+                    clientSocket.receive(clientPacket);
+                } catch (SocketTimeoutException e) {
+                    System.out.println("Connection timed out - Retry");
+                    continue;
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } while(! new String("\0\4"+numPacket).equals(new String(clientPacket.getData())));
+
+            numPacket++;
+        }
+
+        // Closing stream
+        try {
+            if (stream != null) {
+                stream.close();
+            }
+        }
+        catch (IOException ioe) {
+            System.out.println("Error while closing stream: " + ioe);
+        }
     }
 
 }
+
+
