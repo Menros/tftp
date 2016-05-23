@@ -1,3 +1,5 @@
+import com.sun.xml.internal.bind.v2.util.StackRecorder;
+
 import java.io.*;
 import java.net.*;
 
@@ -28,7 +30,7 @@ public class Client {
 
     public void write (String fileName){
 
-        byte[] host = { (byte)169, (byte)254, (byte)114, (byte)197};
+        byte[] host = { (byte)134, (byte)214, (byte)117, (byte)185};
         InetAddress ias = null;
 
         try {
@@ -55,7 +57,7 @@ public class Client {
 
         //Create WRQ DatagramPacket
 
-        String str = "\0\2"+fileName+"\0"+"octet"+"\0";
+        String str = "\0"+"\2"+fileName+"\0"+"octet"+"\0";
         DatagramPacket wrqPacket = new DatagramPacket(str.getBytes(), str.length(), ias, serverPort);
 
         //Connection
@@ -74,17 +76,21 @@ public class Client {
 
             try {
                 clientSocket.receive(clientPacket);
+
             } catch (SocketTimeoutException e) {
                 System.out.println("Connection timed out - Retry");
                 continue;
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        } while(! new String("\0\4\0\0").equals(new String(clientPacket.getData())));
+        } while(clientPacket.getData()[1] != 4 && clientPacket.getData()[3] != 0);
+
+        System.out.println("ACK received " + clientPacket.getData()[3]);
 
         //Running
 
         serverPort = clientPacket.getPort();
+        System.out.println(serverPort);
         byte fileContent[] = new byte[512];
         int cpt = 0;
         short numPacket = 1;
@@ -95,6 +101,7 @@ public class Client {
 
             try {
                 stream.read(fileContent, cpt, 512);
+                System.out.println(new String(fileContent));
                 cpt += 512;
             } catch (IOException e) {
                 e.printStackTrace();
@@ -103,8 +110,8 @@ public class Client {
 
             //Sending packet
 
-            String strData = "\0\3"+numPacket+fileContent;
-            DatagramPacket filePacket = new DatagramPacket(str.getBytes(), str.length(), ias, serverPort);
+            String strData = "\0"+"\3"+numPacket+fileContent;
+            DatagramPacket filePacket = new DatagramPacket(strData.getBytes(), strData.length(), ias, serverPort);
 
             do {
 
