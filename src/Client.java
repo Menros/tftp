@@ -1,3 +1,4 @@
+import com.sun.javafx.iio.ImageFormatDescription;
 import com.sun.xml.internal.bind.v2.util.StackRecorder;
 
 import java.io.*;
@@ -30,7 +31,7 @@ public class Client {
 
     public void write (String fileName){
 
-        byte[] host = { (byte)134, (byte)214, (byte)117, (byte)185};
+        byte[] host = { (byte)134, (byte)214, (byte)119, (byte)116};
         InetAddress ias = null;
 
         try {
@@ -85,24 +86,28 @@ public class Client {
             }
         } while(clientPacket.getData()[1] != 4 && clientPacket.getData()[3] != 0);
 
-        System.out.println("ACK received " + clientPacket.getData()[3]);
+        System.out.println("ACK "+ clientPacket.getData()[3] +" received" );
 
         //Running
 
         serverPort = clientPacket.getPort();
         System.out.println(serverPort);
-        byte fileContent[] = new byte[512];
+        //byte fileContent[] = new byte[512];
+        byte[] strData = new byte[516];
         int cpt = 0;
-        short numPacket = 1;
+        int numPacket = 1;
+        int sizePacket = 512;
 
-        while (cpt < fic.length()){
+        System.out.println("File length :" + fic.length());
+
+        while (cpt < fic.length()) {
 
             //Reading 512 bytes in file
 
             try {
-                stream.read(fileContent, cpt, 512);
-                System.out.println(new String(fileContent));
-                cpt += 512;
+                sizePacket = stream.read(strData, 4, 512);
+                //System.out.println(new String(fileContent));
+                cpt += sizePacket;
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println("Exception while reading file " + e);
@@ -110,9 +115,19 @@ public class Client {
 
             //Sending packet
 
-            String strData = "\0"+"\3"+numPacket+fileContent;
-            DatagramPacket filePacket = new DatagramPacket(strData.getBytes(), strData.length(), ias, serverPort);
+            //"\0"+"\3"+ (byte)numPacket/256 + (byte)numPacket%256+new String(fileContent);
 
+            strData[0] = 0;
+            strData[1] = 3;
+            strData[2] = (byte) (numPacket / 256);
+            strData[3] = (byte) (numPacket % 256);
+            sizePacket += 4;
+
+            System.out.println(strData);
+
+            DatagramPacket filePacket = new DatagramPacket(strData, sizePacket, ias, serverPort);
+
+            byte[] ack;
             do {
 
                 try {
@@ -124,16 +139,19 @@ public class Client {
                 //Receiving ACK
 
                 clientPacket = new DatagramPacket(new byte[4], 4);
+                ack = new byte[4];
 
                 try {
                     clientSocket.receive(clientPacket);
+                    //System.out.println(new String(clientPacket.getData()));
+                    ack = clientPacket.getData();
                 } catch (SocketTimeoutException e) {
                     System.out.println("Connection timed out - Retry");
                     continue;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            } while(! new String("\0\4"+numPacket).equals(new String(clientPacket.getData())));
+            } while (! (ack[0] == 0 && ack[1] == 4 && ack[2] == (byte) (numPacket / 256) && ack[3] == (byte) (numPacket % 256)));
 
             numPacket++;
         }
