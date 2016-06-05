@@ -18,7 +18,7 @@ public class MainClient {
         System.out.println("Ip du serveur : ");
 
         int first = Integer.parseInt(sc.nextLine());
-        int sec = Integer.parseInt(sc.nextLine());
+        int second = Integer.parseInt(sc.nextLine());
         int third = Integer.parseInt(sc.nextLine());
         int fourth = Integer.parseInt(sc.nextLine());
 
@@ -26,6 +26,6 @@ public class MainClient {
         String file = sc.nextLine();
 
         Client c = new Client ();
-        c.write(file, first, sec, third, fourth);
+        c.sendFile(file, first, second, third, fourth);
     }
 }
